@@ -1,13 +1,19 @@
-# paths.fish
+# jgusta/paths
 
-> Reveal the named executable matches in shell paths.
+> Program file locator plugin for Fish
+
+`paths` is a plugin for [fish](https://fishshell.com), the friendly interactive shell.
+
+Use it to locate a program file or executable fish script in the user's path environment variables. Contrast to `which` which does not identify fish function or autoloaded scripts. 
 
 ## Installation
 
-Install with [Fisher](https://github.com/jorgebucaran/fisher):
+Fish plugins are installed with several plugin managers. The best one is [Fisher](https://github.com/jorgebucaran/fisher).
+
+To install with [Fisher](https://github.com/jorgebucaran/fisher):
 
 ```shell
-fisher install jgusta/paths.fish
+fisher install jgusta/paths
 ```
 
 ## Usage
