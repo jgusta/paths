@@ -116,7 +116,7 @@ function paths --description "Reveal the named executable matches in shell paths
                             set nameOut "$name"
                         else
                             set -f __linkname (readlink -f "$name")
-                            set -f arrow \uf178
+                            set -f arrow "=>"
                             if not set -q NO_COLOR
                                 set __linkName (___paths_plugin_wrap_color "$colors[$i]" $__linkname)
                                 set arrow (___paths_plugin_wrap_color "yellow" "$arrow")
