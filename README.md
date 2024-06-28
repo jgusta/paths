@@ -64,3 +64,11 @@ $ paths -s python
 $ eval (paths -s python) -m http.server
 Serving HTTP on :: port 8000 (http://[::]:8000/) ...
 ```
+
+but remember, autoloaded fish scripts are generally not executable:
+
+```shell
+eval (paths -s ls)
+fish: Unknown command. '/usr/local/Cellar/fish/3.7.1/share/fish/functions/ls.fish' exists but is not an executable file.
+/usr/local/Cellar/fish/3.7.1/share/fish/functions/ls.fish
+```
