@@ -59,13 +59,13 @@ function ___paths_plugin_output
     end
 end
 
-function paths --description "Reveal the named executable matches in shell paths."
+function paths --description "Reveal the executable matches in shell paths or fish autoload."
     set options (fish_opt -s q -l clean)
     set -a options (fish_opt -s s -l single)
     set -a options (fish_opt -s n -l no-color)
     argparse $options -- $argv
     if test (count $argv) -lt 1
-        echo "paths - Reveal the named executable matches in shell paths."
+        echo "paths - executable matches in shell paths or fish autoload."
         and echo "usage: paths [-q|-s|-n] <name>"
         and echo -e "\t-q or --clean: output without color or headers"
         and echo -e "\t-s or --single: output without color or headers, the first result"
