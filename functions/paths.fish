@@ -8,7 +8,7 @@ end
 function ___paths_plugin_output
     set -l options (fish_opt -s c -l color --required-val)
     set -a options (fish_opt -s p -l no-prefix) # no prefix
-    set -a options (fish_opt -s k -l clean) # no colors
+    set -a options (fish_opt -s k -l clean) # no ___paths_plugin_colors
     set -a options (fish_opt -s n -l no-endline) # echos without newline
 
     argparse $options -- $argv
@@ -59,7 +59,6 @@ function ___paths_plugin_output
     end
 end
 
-# -S means use parent scope from calling context
 function ___paths_plugin_handle_found_item -S --argument-names testName outFlags
     # re-split flags into list
     set outFlags (string split " " $outFlags)
@@ -75,14 +74,14 @@ function ___paths_plugin_handle_found_item -S --argument-names testName outFlags
                 set -f __linkname (readlink -f "$testName")
                 set -f arrow "=>"
                 if not set -q NO_COLOR
-                    set __linkName (___paths_plugin_wrap_color "$colors[$i]" $__linkname)
+                    set __linkName (___paths_plugin_wrap_color "$___paths_plugin_colors[$i]" $__linkname)
                     set arrow (___paths_plugin_wrap_color "yellow" "$arrow")
                 end
-                set testName (___paths_plugin_output --color="$colors[$i]" $outFlags -n "$testName")
+                set testName (___paths_plugin_output --color="$___paths_plugin_colors[$i]" $outFlags -n "$testName")
                 set nameOut "$testName $arrow $__linkname"
             end
         else
-            set nameOut (___paths_plugin_output --color="$colors[$i]" $outFlags -n "$testName")
+            set nameOut (___paths_plugin_output --color="$___paths_plugin_colors[$i]" $outFlags -n "$testName")
         end
         echo "$nameOut"
     end # [end check file name]
@@ -110,6 +109,7 @@ function paths --description "Reveal the executable matches in shell paths or fi
     set -a options (fish_opt -s s -l single)
     set -a options (fish_opt -s n -l no-color)
     argparse $options -- $argv
+    
     if test (count $argv) -lt 1
         echo "paths - executable matches in shell paths or fish autoload."
         and echo "usage: paths [-q|-s|-n] <name>"
@@ -118,6 +118,7 @@ function paths --description "Reveal the executable matches in shell paths or fi
         and echo -e "\t-n or --no-color: output without color"
         and return 1
     end
+
     set -f foundStatus 1
     set -f input $argv
     set -f outFlags ''
@@ -137,26 +138,28 @@ function paths --description "Reveal the executable matches in shell paths or fi
         set -p outFlags -p
     end
 
+    ___paths_plugin_set_colors
 
-    set colors 7343A9 9B0F8C B8007F CE2029 D84528 E26928 EB8E27 F5B227 FFD726 FFE675 FFF6CC FFEEE2 FFF5FF 10EDF5 28BCE0 556CBC 7343A9 9B0F8C B8007F CE2029 D84528 E26928 EB8E27 F5B227 FFD726 FFE675 FFF6CC FFEEE2 FFF5FF 10EDF5 28BCE0 556CBC
-    set -f i (count $colors)
+    set -f i (count $___paths_plugin_colors)
+
     # loop over list of path lists
     for pVar in VIRTUAL_ENV fisher_path fish_function_path fish_user_paths PATH
         set -e acc
         set -f acc
+
         # see if variable is empty
         if test -z "$pVar"
             continue
         end
+
         # loop over path lists
-#        type pyenv-brew-relink | string match -g -r '^\# Defined in (.*?) @ line \d+\s*$'
         for t in $$pVar
             # loop over files with and without fish 
             for name in "$t/$input.fish" "$t/bin/$input" "$t/$input"
                 set -a acc (___paths_plugin_handle_found_item "$name" "$outFlags")
-            end # [end file name list loop]
-        end # [end path list loop]
-        
+            end
+        end
+
         set -p acc (___paths_plugin_handle_source "$pVar" "$acc")
 
         # next color
@@ -168,6 +171,6 @@ function paths --description "Reveal the executable matches in shell paths or fi
                 return $foundStatus
             end
         end
-    end # [end list of path lists loop]
+    end
     return $foundStatus
 end
