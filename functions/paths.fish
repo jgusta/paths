@@ -23,21 +23,21 @@ function ___paths_plugin_output
         if not set -q _flag_p
             # color tick?
             if not set -q _flag_k
-                set tick (___paths_plugin_wrap_color "yellow" $tick)
+                set tick (___paths_plugin_wrap_color "yellow" "$tick")
             end
         end
         # wrap line in color or not
         if set -q _flag_k
             set listy $argv
         else
-            set listy (___paths_plugin_wrap_color $_flag_c $argv)
+            set listy (___paths_plugin_wrap_color $_flag_c "$argv")
         end
     else
         # include tick?
         if not set -q _flag_p
             # we still color the tick unless -k is set
             if not set -q _flag_k
-                set tick (___paths_plugin_wrap_color "yellow" $tick)
+                set tick (___paths_plugin_wrap_color "yellow" "$tick")
             end
         end
         # do not wrap line in color
@@ -56,6 +56,52 @@ function ___paths_plugin_output
         echo -n "$acc"
     else
         echo -n -e "$acc\n"
+    end
+end
+
+# -S means use parent scope from calling context
+function ___paths_plugin_handle_found_item -S --argument-names testName outFlags
+    # re-split flags into list
+    set outFlags (string split " " $outFlags)
+    # check if file exists
+    if test -e "$testName"
+        set -f nameOut "$testName"
+        # check if file is a symlink
+        if test -L "$testName"
+            if set -q _flag_q
+                or set -q _flag_s
+                :
+            else
+                set -f __linkname (readlink -f "$testName")
+                set -f arrow "=>"
+                if not set -q NO_COLOR
+                    set __linkName (___paths_plugin_wrap_color "$colors[$i]" $__linkname)
+                    set arrow (___paths_plugin_wrap_color "yellow" "$arrow")
+                end
+                set testName (___paths_plugin_output --color="$colors[$i]" $outFlags -n "$testName")
+                set nameOut "$testName $arrow $__linkname"
+            end
+        else
+            set nameOut (___paths_plugin_output --color="$colors[$i]" $outFlags -n "$testName")
+        end
+        echo "$nameOut"
+    end # [end check file name]
+end
+
+function ___paths_plugin_handle_source --argument-names source acc
+    #echo "i am run" "$source : $acc"
+    # only print anything if there is anything.
+    if set -q acc
+        # determine if we print the source or not
+        if not set -q _flag_q
+            and not set -q _flag_s
+            # prepend source
+            set -p acc "$source\n"
+            set -a acc "\n"
+        end
+
+        # echo the whole section
+        echo -e "$acc"
     end
 end
 
@@ -97,69 +143,31 @@ function paths --description "Reveal the executable matches in shell paths or fi
     # loop over list of path lists
     for pVar in VIRTUAL_ENV fisher_path fish_function_path fish_user_paths PATH
         set -e acc
-
+        set -f acc
         # see if variable is empty
         if test -z "$pVar"
             continue
         end
         # loop over path lists
+#        type pyenv-brew-relink | string match -g -r '^\# Defined in (.*?) @ line \d+\s*$'
         for t in $$pVar
             # loop over files with and without fish 
             for name in "$t/$input.fish" "$t/bin/$input" "$t/$input"
-                # check if file exists
-                if test -f "$name"
-                    set -f nameOut $name
-                    # check if file is a symlink
-                    if test -L "$name"
-                        if set -q _flag_q
-                            or set -q _flag_s
-                            set nameOut "$name"
-                        else
-                            set -f __linkname (readlink -f "$name")
-                            set -f arrow "=>"
-                            if not set -q NO_COLOR
-                                set __linkName (___paths_plugin_wrap_color "$colors[$i]" $__linkname)
-                                set arrow (___paths_plugin_wrap_color "yellow" "$arrow")
-                            end
-                            set name (___paths_plugin_output --color="$colors[$i]" $outFlags -n "$name")
-                            set nameOut "$name $arrow $__linkname"
-                        end
-                    else
-                        set nameOut (___paths_plugin_output --color="$colors[$i]" $outFlags -n "$name")
-                    end
-                    # if acc doesn't exist, create it
-                    if set -q acc
-                        set -f acc "$nameOut"
-                    else
-                        set -a acc "$nameOut"
-                    end
-                end # [end check file name]
+                set -a acc (___paths_plugin_handle_found_item "$name" "$outFlags")
             end # [end file name list loop]
         end # [end path list loop]
+        
+        set -p acc (___paths_plugin_handle_source "$pVar" "$acc")
 
-        # only print anything if there is anything.
-        if set -q acc
-            # determine if we print the source or not
-            if not set -q _flag_q
-                and not set -q _flag_s
-                # prepend source
-                set -p acc "$pVar\n"
-                set -a acc "\n"
-            end
-
-            # echo the whole section
-            echo -e "$acc"
-
-            # next color
-            set i (math $i - 1)
-
-            # if single flag, then we are done here.
-            if set -q _flag_s
-                return 0
-            end
+        # next color
+        if test -n "$acc"
             set foundStatus 0
+            echo -e "$acc"
+            set i (math $i - 1)
+            if set -q _flag_s
+                return $foundStatus
+            end
         end
-
     end # [end list of path lists loop]
     return $foundStatus
 end
