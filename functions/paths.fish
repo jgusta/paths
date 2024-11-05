@@ -52,7 +52,7 @@ function ___paths_plugin_handle_found_item -a testName outFlags
             if set -q _flag_k # is not color
                 set nameOut "- $nameOut"
             else # is color
-                set nameOut (___paths_plugin_wrap_color "yellow" "- ") "$nameOut"
+                set nameOut (___paths_plugin_wrap_color "yellow" "-") "$nameOut"
             end
         end
         set nameOut (string trim -- "$nameOut")
@@ -64,6 +64,7 @@ function paths --description "Reveal the executable matches in shell paths or fi
     set -f options (fish_opt -s c -l clean)
     set -a options (fish_opt -s s -l single)
     set -a options (fish_opt -s k -l no-color)
+    set -a options (fish_opt -s q -l quiet)
     set -a options (fish_opt -s n -l inline)
     argparse $options -- $argv
 
@@ -79,10 +80,16 @@ function paths --description "Reveal the executable matches in shell paths or fi
 
     set -f foundStatus 1
     set -f input $argv
+    # deprecated
+    if set -q _flag_q
+        set _flag_c True
+    end
+
     if set -q _flag_s
         set _flag_k True
         set _flag_c True
     end
+    
     set -f outFlags ''
     set -q _flag_n; and set -a outFlags -n
     set -q _flag_c; and set -a outFlags -c

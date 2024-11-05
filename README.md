@@ -42,10 +42,10 @@ PATH
 
 ```
 
-Use `-q` to skip the headers and colors and list markers:
+Use `-c` to skip the headers and colors and list markers:
 
 ```shell
-$ paths -q python
+$ paths -c python
 /Users/me/code/venv/reoner-QKlu_Gbg/bin/python
 /usr/local/bin/python
 
