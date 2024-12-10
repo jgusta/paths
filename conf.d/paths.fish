@@ -18,5 +18,8 @@ function _paths_install --on-event _paths_install
 end
 
 function _paths_update --on-event paths_update
+    for i in ___paths_plugin_wrap_color ___paths_plugin_output ___paths_plugin_handle_found_item ___paths_plugin_handle_source ___paths_plugin_cycle_color
+        functions -e $i
+    end
     ___paths_plugin_set_colors
 end

@@ -1,3 +1,62 @@
+# paths plugin
+# for fish shell
+# by jgusta (https://github.com/jgusta)
+set -gx VERSION 1.2.0
+
+function ___paths_plugin_help
+    echo "paths - executable matches in shell paths or fish autoload."
+    echo "Usage: paths [-c|-s|-k] <name>"
+    echo "Arguments:"
+    echo "    <name> - name of a fish autoload function, function, shell script, executable or builtin"
+    echo ""
+    echo "Options:"
+    echo ""
+    echo "-k, --no-color"
+    echo "    Output without color"
+    echo ""
+    echo "-c, --clean"
+    echo "    Output without tick marks, headers or saymlink destination."
+    echo "    Implies -k."
+    echo ""
+    echo "-s, --single:"
+    echo "    Output the first result. Implies -k -c"
+    echo ""
+    echo "-f, --fail-if-not-path"
+    echo "    If the first result that would be output is not an executable file"
+    echo "    then return nothing and exit with status 1. Use if you want to make sure"
+    echo "    that the output is executable before you run it."
+    echo ""
+    echo "Explaination:"
+    echo ""
+    echo "    paths is a fish function (similar to ```type -a```) that takes a command name and walks"
+    echo "    through each of the executable locations to see where the command will"
+    echo "    execute from. Once found, it continues to find each subsequent location"
+    echo "    that are next in line were the first command be removed (with exceptions*)."
+    echo "    Commands are listed in priority order with a heading for each group of"
+    echo "    executable listing."
+    echo ""
+    echo "Limitations:"
+    echo ""
+    echo "  * For declared functions such as those loaded by config.fish only the"
+    echo "    latest sourced function will be listed. i.e. if the function is overwritten,"
+    echo "    paths will not be able to tell what it was before it was overwritten. "
+    echo "    In the event of a function defined via stdin into the source command,"
+    echo "    the output will path will be '-' unless the `--fail-if-not-path` option"
+    echo "    is set."
+    echo ""
+    echo "Executable schemes and locations:"
+    echo ""
+    echo "    - paths checks the following locations for executables in this order:"
+    echo "    - functions defined interactively"
+    echo "    - functions defined via standard input into `source`"
+    echo "    - \$fish_function_path"
+    echo "    - \$fish_user_paths"
+    echo "    - \$PATH"
+    echo "    - builtins"
+    echo ""
+    echo "    Note that some builtins will appear twice because they are also in an executable path"
+end
+
 function ___paths_plugin_wrap_color
     set_color normal
     set_color "$argv[1]"
@@ -29,7 +88,27 @@ function ___paths_plugin_handle_found_item -a testName outFlags
     set -a options (fish_opt -s s -l single)
     set -a options (fish_opt -s k -l no-color)
     set -a options (fish_opt -s n -l inline)
+    set -a options (fish_opt -s z -l special)
     argparse $options -- $flags
+
+    if set -q _flag_z
+        set -f nameOut (string trim -- "$testName")
+        if not set -q _flag_c
+            if not set -q _flag_k
+                set nameOut (___paths_plugin_wrap_color (___paths_plugin_cycle_color) "$nameOut")
+            end
+            set nameOut (string trim -- "$nameOut")
+            # do the tick 
+            if set -q _flag_k # is not color
+                set nameOut "- $nameOut"
+            else # is color
+                set nameOut (___paths_plugin_wrap_color "yellow" "-") "$nameOut"
+            end
+            set nameOut (string trim -- "$nameOut")
+        end
+        echo -n $nameOut
+        return
+    end
 
     set -f arrow "=>"
     # check if file exists
@@ -41,7 +120,7 @@ function ___paths_plugin_handle_found_item -a testName outFlags
                 set __linkname (string trim -- "$__linkname")
                 set testName (string trim -- "$testName")
                 if not set -q _flag_k # is color
-                    set nameOut (___paths_plugin_wrap_color (___paths_plugin_cycle_color) $testName) (___paths_plugin_wrap_color "yellow" "$arrow") (___paths_plugin_wrap_color (___paths_plugin_cycle_color) $__linkname)
+                    set nameOut (___paths_plugin_wrap_color (___paths_plugin_cycle_color) "$testName") (___paths_plugin_wrap_color "yellow" "$arrow") (___paths_plugin_wrap_color (___paths_plugin_cycle_color) "$__linkname")
                 else # is color
                     set nameOut (echo -n "$testName" "$arrow" "$__linkname")
                 end
@@ -64,28 +143,33 @@ function ___paths_plugin_handle_found_item -a testName outFlags
             end
         end
         set nameOut (string trim -- "$nameOut")
-        echo -n $nameOut
+        echo -n "$nameOut"
     end
 end
 
 function paths --description "Reveal the executable matches in shell paths or fish autoload."
     set -f options (fish_opt -s c -l clean)
     set -a options (fish_opt -s s -l single)
-    set -a options (fish_opt -s k -l no-color)
+    set -a options (fish_opt -s k -l "no-color")
     set -a options (fish_opt -s q -l quiet)
     set -a options (fish_opt -s n -l inline)
+    set -a options (fish_opt -s v -l version)
+    set -a options (fish_opt -s h -l help)
+    set -a options (fish_opt -s e -l "fail-if-not-path")
     argparse $options -- $argv
 
-    if test -z (count $argv) -lt 1
-        set -f SCRIPTNAME (status function)
-        echo "paths - executable matches in shell paths or fish autoload."
-        and echo "usage: paths [-c|-s|-k] <name>"
-        and echo -e "\t-k or --no-color: output without color"
-        and echo -e "\t-c or --clean: output without tick marks or headers. Just a list of paths"
-        and echo -e "\t-s or --single: output path in a single clean line. Implies -k and -c"
-        and echo -e ""
-        and echo -e ""
-        # and echo -e "\t-n or --inline: output without endline"
+    if set -q _flag_h
+        ___paths_plugin_help
+        and return 0
+    end
+
+    if set -q _flag_v
+        echo "paths plugin version $VERSION"
+        and return 0
+    end
+
+    if test (count $argv) -lt 1
+        ___paths_plugin_help
         and return 1
     end
 
@@ -112,8 +196,44 @@ function paths --description "Reveal the executable matches in shell paths or fi
     set -q _flag_s; and set -a outFlags -s
     set outFlags (string split -n " " -- "$outFlags")
     ___paths_plugin_set_colors
+
+    set -f specialFlags (string split -n " " -- "$outFlags -z")
+    set -l special (functions "$input" | string match -r -i "# Defined (?:via `(source)`|(interactively))" | awk NR==2)
+
+    if test "$special" = "interactively"
+        if set -q _flag_e
+            return 1
+        end
+        if not set -q _flag_c
+            echo -e -n "Defined interactively\n"
+        end
+        set foundStatus 0
+
+        set -f found (___paths_plugin_handle_found_item "$input" "$specialFlags")
+        echo "$found"
+        if set -q _flag_s
+            # stop after one
+            return $foundStatus
+        end
+    end
+
+    if test "$special" = "source"
+        if set -q _flag_e
+            return 1
+        end
+        if not set -q _flag_c
+            echo -e -n "Defined via source\n"
+        end
+        set foundStatus 0
+        ___paths_plugin_handle_found_item
+        if set -q _flag_s
+            # stop after one
+            return $foundStatus
+        end
+    end
+
     # loop over list of path lists
-    for pVar in VIRTUAL_ENV fisher_path fish_function_path fish_user_paths PATH
+    for pVar in VIRTUAL_ENV fish_function_path fish_user_paths PATH
         set -e acc
         set -f acc ''
         set -e hit
@@ -153,7 +273,7 @@ function paths --description "Reveal the executable matches in shell paths or fi
         if test -n "$acc"
             set foundStatus 0
             for fk in $acc
-                echo $fk
+                echo "$fk"
                 if set -q _flag_s
                     # stop after one
                     return $foundStatus
@@ -162,21 +282,21 @@ function paths --description "Reveal the executable matches in shell paths or fi
         end
     end
 
-    # check 
-    set -l built (type --type $input 12&>/dev/null)
-    if test -n "$built"
-        and test "$built" = 'builtin'
-        set $foundStatus 0
+    set -l special (type -t $input)
+    if test "$special" = "builtin"
+        if set -q _flag_e
+            return 1
+        end
         if not set -q _flag_c
-            echo -e -n "builtin\n"
-            if set -q _flag_k
-                echo - "$input"
-            else # is color
-                echo (___paths_plugin_wrap_color "yellow" "-") (___paths_plugin_wrap_color (___paths_plugin_cycle_color) "$input")
-            end
-        else
-            echo "$input"
+            echo -e -n "Built-in command\n"
+        end
+        set foundStatus 0
+        if set -q _flag_s
+            # stop after one
+            return $foundStatus
         end
     end
+
     return $foundStatus
 end
+
