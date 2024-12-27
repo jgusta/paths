@@ -79,7 +79,7 @@ function paths --description "Reveal the executable matches in shell paths or fi
     end
 
     set -f foundStatus 1
-    set -f input $argv
+    set -f input (string trim -- $argv)
     # deprecated
     if set -q _flag_q
         set _flag_c True
@@ -89,7 +89,7 @@ function paths --description "Reveal the executable matches in shell paths or fi
         set _flag_k True
         set _flag_c True
     end
-    
+
     set -f outFlags ''
     set -q _flag_n; and set -a outFlags -n
     set -q _flag_c; and set -a outFlags -c
@@ -144,6 +144,23 @@ function paths --description "Reveal the executable matches in shell paths or fi
                     return $foundStatus
                 end
             end
+        end
+    end
+
+    # check 
+    set -l built (type --type $input 12&>/dev/null)
+    if test -n "$built"
+        and test "$built" = 'builtin'
+        set $foundStatus 0
+        if not set -q _flag_c
+            echo -e -n "builtin\n"
+            if set -q _flag_k
+                echo - "$input"
+            else # is color
+                echo (___paths_plugin_wrap_color "yellow" "-") (___paths_plugin_wrap_color (___paths_plugin_cycle_color) "$input")
+            end
+        else
+            echo "$input"
         end
     end
     return $foundStatus
