@@ -76,12 +76,15 @@ function paths --description "Reveal the executable matches in shell paths or fi
     set -a options (fish_opt -s n -l inline)
     argparse $options -- $argv
 
-    if test (count $argv) -lt 1
+    if test -z (count $argv) -lt 1
+        set -f SCRIPTNAME (status function)
         echo "paths - executable matches in shell paths or fish autoload."
         and echo "usage: paths [-c|-s|-k] <name>"
-        and echo -e "\t-c or --no-color: output without color"
-        and echo -e "\t-s or --single: output without color or headers, the first result"
-        and echo -e "\t-k or --clean: output without tick marks or headers"
+        and echo -e "\t-k or --no-color: output without color"
+        and echo -e "\t-c or --clean: output without tick marks or headers. Just a list of paths"
+        and echo -e "\t-s or --single: output path in a single clean line. Implies -k and -c"
+        and echo -e ""
+        and echo -e ""
         # and echo -e "\t-n or --inline: output without endline"
         and return 1
     end
@@ -91,6 +94,10 @@ function paths --description "Reveal the executable matches in shell paths or fi
     # deprecated
     if set -q _flag_q
         set _flag_c True
+    end
+
+    if set -q NO_COLOR
+        set _flag_k True
     end
 
     if set -q _flag_s
