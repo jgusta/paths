@@ -30,7 +30,7 @@ PATH
 
 ```
 
-Possible values for the source headers are `VIRTUAL_ENV`, `fisher_path`, `fish_function_path`, `fish_user_paths`, `PATH`. It even understands python virtual environments:
+Possible values for the source headers are `Defined interactively`, `Defined via source`, `VIRTUAL_ENV`, `fisher_path`, `fish_function_path`, `fish_user_paths`, `PATH`, `Built-in command`. It even understands python virtual environments:
 
 ```shell
 $ paths python

@@ -1,7 +1,9 @@
 # paths plugin
 # for fish shell
 # by jgusta (https://github.com/jgusta)
-set -gx VERSION 1.2.0
+
+# previously was polluting globals with "VERSION"
+set -gx ___paths_plugin_VERSION 1.2.1
 
 function ___paths_plugin_wrap_bold
     set_color normal
@@ -16,7 +18,7 @@ function ___paths_plugin_help
     echo (___paths_plugin_wrap_bold "USAGE")
     echo ""
     echo "\
-        paths [-c|-s|-k|-f|-v] <name>"
+        paths [-c|-s|-k|-f|-d|-e|-v] <name>"
     echo ""
     echo (___paths_plugin_wrap_bold "ARGUMENTS")
     echo ""
@@ -43,13 +45,17 @@ function ___paths_plugin_help
         then return nothing and exit with status 1. Use if you want to make sure
         that the output is executable before you run it. Implies -s."
     echo ""
+    echo "    -d, --dir
+        Jumps to the containing directory of the first result, if it is a
+        directory. Implies -e -s -c -k"
+    echo ""
     echo "    -v, --version
         Display version number"
     echo ""
     echo "    -h, --help
         Output this help text"
     echo ""
-    echo (___paths_plugin_wrap_bold "EXPLAINATION")
+    echo (___paths_plugin_wrap_bold "EXPLANATION")
     echo ""
     echo "\
         paths is a fish function that takes a command name and walks
@@ -87,7 +93,7 @@ end
 function ___paths_plugin_short_help
     echo "executable matches in shell paths or fish autoload."
 
-    echo (___paths_plugin_wrap_bold "USAGE") "paths [-c|-s|-k|-f|-v] [NAME]"
+    echo (___paths_plugin_wrap_bold "USAGE") "paths [-c|-s|-k|-f|-e|-d|-v] [NAME]"
     echo ""
     echo (___paths_plugin_wrap_bold "ARGUMENTS")
     echo "       [NAME] - name of a fish autoload function, function, shell script, executable or builtin"
@@ -97,8 +103,9 @@ function ___paths_plugin_short_help
     echo "    -k, --no-color               Output without color"
     echo "    -c, --clean                  Clean output. Implies -k."
     echo "    -s, --single                 Output the first result. Implies -k -c"
+    echo "    -d, --dir                    Jump to containing directory of first result (using pushd). Implies -e (thus -s, -k, -c)"
+    echo "    -e, --fail-if-not-path       Return false if output not executable file. Implies -s (thus -k, -c)"
     echo "    -l, --list                   Show all places fish looks for executables"
-    echo "    -e, --fail-if-not-path       Return false if output not executable file. Implies -s"
     echo "    -v, --version.               Display version number"
     echo ""
 end
@@ -132,6 +139,7 @@ function ___paths_plugin_handle_found_item -a testName outFlags
     set -f flags (string split -n ' ' -- "$outFlags")
     set -f options (fish_opt -s c -l clean)
     set -a options (fish_opt -s s -l single)
+    set -a options (fish_opt -s d -l dir)
     set -a options (fish_opt -s k -l no-color)
     set -a options (fish_opt -s n -l inline)
     set -a options (fish_opt -s z -l special)
@@ -160,6 +168,19 @@ function ___paths_plugin_handle_found_item -a testName outFlags
     # check if file exists
     if test -e "$testName"
         set -f nameOut (string trim -- "$testName")
+        if set -q _flag_d # directory flag
+            set -f dir (dirname "$testName")
+            if test -d "$dir"
+                if functions -q pushd
+                    pushd "$dir"
+                else
+                    cd "$dir"
+                end
+            else
+                echo "[paths plugin $___paths_plugin_VERSION] Cannot find directory $dir" >&2
+                return 1
+            end
+        end
         if not set -q _flag_c # is not clean
             if test -L "$testName" # is symlink
                 set -f __linkname (readlink -f "$testName")
@@ -198,12 +219,21 @@ function paths --description "Reveal the executable matches in shell paths or fi
     set -a options (fish_opt -s s -l single)
     set -a options (fish_opt -s k -l "no-color")
     set -a options (fish_opt -s q -l quiet)
+    set -a options (fish_opt -s d -l dir)
     set -a options (fish_opt -s v -l version)
     set -a options (fish_opt -s n -l inline)
     set -a options (fish_opt -s l -l list)
     set -a options (fish_opt -s h -l help)
     set -a options (fish_opt -s e -l "fail-if-not-path")
     argparse $options -- $argv
+
+    # This plugin may be undefined when first loaded because of a real
+    # dumb mistake where the update script deleted all the helper functions.
+    # Can probably remove this check in the future.
+    if not functions -q ___paths_plugin_handle_found_item
+        echo "[paths plugin $___paths_plugin_VERSION] Please reload your shell before using this command" >&2
+        return 1
+    end
 
     if set -q _flag_h
         ___paths_plugin_help
@@ -228,7 +258,7 @@ function paths --description "Reveal the executable matches in shell paths or fi
     set -f input (string trim -- $argv)
 
     if set -q _flag_v
-        echo "paths plugin version $VERSION"
+        echo "paths plugin version $___paths_plugin_VERSION"
         and return 0
     end
 
@@ -238,6 +268,10 @@ function paths --description "Reveal the executable matches in shell paths or fi
     # deprecated
     if set -q _flag_q
         set _flag_c True
+    end
+
+    if set -q _flag_d
+        set _flag_e True
     end
 
     if set -q _flag_e
@@ -258,6 +292,7 @@ function paths --description "Reveal the executable matches in shell paths or fi
     set -q _flag_c; and set -a outFlags -c
     set -q _flag_k; and set -a outFlags -k
     set -q _flag_s; and set -a outFlags -s
+    set -q _flag_d; and set -a outFlags -d
     set outFlags (string split -n " " -- "$outFlags")
     ___paths_plugin_set_colors
 
@@ -266,6 +301,7 @@ function paths --description "Reveal the executable matches in shell paths or fi
 
     if test "$special" = interactively
         if set -q _flag_e
+            echo "[paths plugin $___paths_plugin_VERSION] Function not a file" >&2
             return 1
         end
         if not set -q _flag_c
@@ -283,6 +319,7 @@ function paths --description "Reveal the executable matches in shell paths or fi
 
     if test "$special" = source
         if set -q _flag_e
+            echo "[paths plugin $___paths_plugin_VERSION] Function not a file" >&2
             return 1
         end
         if not set -q _flag_c
@@ -349,6 +386,7 @@ function paths --description "Reveal the executable matches in shell paths or fi
     set -l special (type -t $input)
     if test "$special" = builtin
         if set -q _flag_e
+            echo "[paths plugin $___paths_plugin_VERSION] Function not a file" >&2
             return 1
         end
         if not set -q _flag_c
@@ -363,3 +401,18 @@ function paths --description "Reveal the executable matches in shell paths or fi
 
     return $foundStatus
 end
+
+########
+# Changelog
+########
+#
+# 1.2.1 | 2026-01-07
+# - Add -d/--dir option to jump to the containing directory
+# - Change VERSION variable to ___paths_plugin_VERSION
+# - Make all errors output to stderr with message
+# - Fix reload-needed error caused by deleting all helper functions 
+#   when updating via fisher
+# - Update help display
+# - Update README
+#
+########
