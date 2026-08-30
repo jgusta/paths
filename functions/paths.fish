@@ -240,6 +240,11 @@ function paths --description "Reveal the executable matches in shell paths or fi
         and return 0
     end
 
+    if set -q _flag_v
+        echo "paths plugin version $___paths_plugin_VERSION"
+        and return 0
+    end
+
     if set -q _flag_l
         set input " "
     else
@@ -256,11 +261,6 @@ function paths --description "Reveal the executable matches in shell paths or fi
 
     set -f foundStatus 1
     set -f input (string trim -- $argv)
-
-    if set -q _flag_v
-        echo "paths plugin version $___paths_plugin_VERSION"
-        and return 0
-    end
 
     set -f foundStatus 1
     set -f input (string trim -- $argv)
@@ -333,6 +333,11 @@ function paths --description "Reveal the executable matches in shell paths or fi
         end
     end
 
+    set -f virtualEnvironmentBins
+    for virtualEnvironment in $VIRTUAL_ENV
+        set -a virtualEnvironmentBins (string replace -r '/+$' '' -- "$virtualEnvironment")/bin
+    end
+
     # loop over list of path lists
     for pVar in VIRTUAL_ENV fish_function_path fish_user_paths PATH
         set -e acc
@@ -344,7 +349,13 @@ function paths --description "Reveal the executable matches in shell paths or fi
         end
         set -f acc (begin
             for t in $$pVar
-                for snit in "$t/$input.fish" "$t/$input"
+                set -f searchPath "$t"
+                if test "$pVar" = VIRTUAL_ENV
+                    set searchPath (string replace -r '/+$' '' -- "$t")/bin
+                else if test "$pVar" = PATH; and contains -- "$t" $virtualEnvironmentBins
+                    continue
+                end
+                for snit in "$searchPath/$input.fish" "$searchPath/$input"
                     set -f found (___paths_plugin_handle_found_item "$snit" "$outFlags")
                     set found (string trim -- "$found")
                     if test -n "$found"
@@ -405,7 +416,10 @@ end
 ########
 # Changelog
 ########
-#
+# 1.2.2 | 2026-08-30
+# - Fix searching VIRTUAL_ENV rather than VIRTUAL_ENV/bin for paths
+# - Fix duplication that same entry under PATH
+# - Fix --version not working without argument
 # 1.2.1 | 2026-01-07
 # - Add -d/--dir option to jump to the containing directory
 # - Change VERSION variable to ___paths_plugin_VERSION
