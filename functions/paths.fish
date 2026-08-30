@@ -3,7 +3,7 @@
 # by jgusta (https://github.com/jgusta)
 
 # previously was polluting globals with "VERSION"
-set -gx ___paths_plugin_VERSION 1.2.1
+set -gx ___paths_plugin_VERSION 1.2.3
 
 function ___paths_plugin_wrap_bold
     set_color normal
@@ -245,22 +245,10 @@ function paths --description "Reveal the executable matches in shell paths or fi
         and return 0
     end
 
-    if set -q _flag_l
-        set input " "
-    else
-        if test (count $argv) -lt 1
-            ___paths_plugin_short_help
-            and return 1
-        end
-    end
-
-    if test (count $argv) -lt 1
-        ___paths_plugin_help
+    if not set -q _flag_l; and test (count $argv) -lt 1
+        ___paths_plugin_short_help
         and return 1
     end
-
-    set -f foundStatus 1
-    set -f input (string trim -- $argv)
 
     set -f foundStatus 1
     set -f input (string trim -- $argv)
@@ -297,7 +285,10 @@ function paths --description "Reveal the executable matches in shell paths or fi
     ___paths_plugin_set_colors
 
     set -f specialFlags (string split -n " " -- "$outFlags -z")
-    set -l special (functions "$input" | string match -r -i "# Defined (?:via `(source)`|(interactively))" | awk NR==2)
+    set -l special
+    if not set -q _flag_l
+        set special (functions "$input" | string match -r -i "# Defined (?:via `(source)`|(interactively))" | awk NR==2)
+    end
 
     if test "$special" = interactively
         if set -q _flag_e
@@ -355,7 +346,11 @@ function paths --description "Reveal the executable matches in shell paths or fi
                 else if test "$pVar" = PATH; and contains -- "$t" $virtualEnvironmentBins
                     continue
                 end
-                for snit in "$searchPath/$input.fish" "$searchPath/$input"
+                set -f candidates "$searchPath/$input.fish" "$searchPath/$input"
+                if set -q _flag_l
+                    set candidates "$searchPath"
+                end
+                for snit in $candidates
                     set -f found (___paths_plugin_handle_found_item "$snit" "$outFlags")
                     set found (string trim -- "$found")
                     if test -n "$found"
@@ -394,6 +389,10 @@ function paths --description "Reveal the executable matches in shell paths or fi
         end
     end
 
+    if set -q _flag_l
+        return $foundStatus
+    end
+
     set -l special (type -t $input)
     if test "$special" = builtin
         if set -q _flag_e
@@ -416,6 +415,9 @@ end
 ########
 # Changelog
 ########
+# 1.2.3 | 2026-08-30
+# - Fix wrong version
+# - Fix -l/--list to work
 # 1.2.2 | 2026-08-30
 # - Fix searching VIRTUAL_ENV rather than VIRTUAL_ENV/bin for paths
 # - Fix duplication that same entry under PATH
