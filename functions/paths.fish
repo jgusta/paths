@@ -143,6 +143,7 @@ function ___paths_plugin_handle_found_item -a testName outFlags
     set -a options (fish_opt -s k -l no-color)
     set -a options (fish_opt -s n -l inline)
     set -a options (fish_opt -s z -l special)
+    set -a options (fish_opt -s l -l list)
     argparse $options -- $flags
 
     if set -q _flag_z
@@ -165,8 +166,8 @@ function ___paths_plugin_handle_found_item -a testName outFlags
     end
 
     set -f arrow "=>"
-    # check if file exists
-    if test -e "$testName"
+    # Command matches must be files; --list displays search directories.
+    if test -f "$testName"; or begin; set -q _flag_l; and test -d "$testName"; end
         set -f nameOut (string trim -- "$testName")
         if set -q _flag_d # directory flag
             set -f dir (dirname "$testName")
@@ -281,6 +282,7 @@ function paths --description "Reveal the executable matches in shell paths or fi
     set -q _flag_k; and set -a outFlags -k
     set -q _flag_s; and set -a outFlags -s
     set -q _flag_d; and set -a outFlags -d
+    set -q _flag_l; and set -a outFlags -l
     set outFlags (string split -n " " -- "$outFlags")
     ___paths_plugin_set_colors
 
@@ -415,6 +417,8 @@ end
 ########
 # Changelog
 ########
+# 1.2.4 | 2026-11-24
+# - Change to test -f from test -f so that directories arent matches.
 # 1.2.3 | 2026-08-30
 # - Fix wrong version
 # - Fix -l/--list to work
