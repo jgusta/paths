@@ -2,7 +2,7 @@
 # for fish shell
 # by jgusta (https://github.com/jgusta)
 
-set -gx ___paths_plugin_VERSION 1.2.6
+set -gx ___paths_plugin_VERSION 1.2.7
 
 function ___paths_plugin_wrap_bold
     set_color normal
@@ -316,7 +316,16 @@ function paths --description "Reveal the executable matches in shell paths or fi
         set embeddedDefinitions (string match 'embedded:*' -- $definition)
         for definitionPath in $definition
             if test -f "$definitionPath"
-                set -a definitionFiles "$definitionPath"
+                set -l isAutoloadFile 0
+                for functionDirectory in $fish_function_path
+                    if test "$definitionPath" -ef "$functionDirectory/$input.fish"
+                        set isAutoloadFile 1
+                        break
+                    end
+                end
+                if test $isAutoloadFile -eq 0
+                    set -a definitionFiles "$definitionPath"
+                end
             end
         end
     end
@@ -487,6 +496,8 @@ end
 ########
 # Changelog
 ########
+# 1.2.7 | 2026-11-25
+# - Keep autoload files under fish_function_path instead of Defined in file.
 # 1.2.6 | 2026-11-26
 # - Show the current function's defining file before path searches, preserving
 #   separate autoload candidates and skipping duplicate autoload entries for that file.
