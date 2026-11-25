@@ -30,15 +30,15 @@ PATH
 
 ```
 
-Possible values for the source headers are `Defined interactively`, `Defined via source`, `VIRTUAL_ENV`, `fisher_path`, `fish_function_path`, `fish_user_paths`, `PATH`, `Built-in command`. It even understands python virtual environments:
+Possible values for the source headers are `Defined interactively`, `Defined via stdin`, `Defined via source`, `VIRTUAL_ENV`, `fish_function_path`, `fish_user_paths`, `PATH`, `embedded`, `Built-in command`. It even understands python virtual environments:
 
 ```shell
 $ paths python
 VIRTUAL_ENV
- -  /Users/me/code/venv/myprog-QKlu_Gbg/bin/python  /usr/local/Cellar/python@3.9/3.9.19/Frameworks/Python.framework/Versions/3.9/bin/python3.9 
+ -  /Users/me/code/venv/myprog-QKlu_Gbg/bin/python => /usr/local/Cellar/python@3.9/3.9.19/Frameworks/Python.framework/Versions/3.9/bin/python3.9 
 
 PATH
- -  /usr/local/bin/python  /Library/Frameworks/Python.framework/Versions/2.7/bin/python2.7 
+ -  /usr/local/bin/python => /Library/Frameworks/Python.framework/Versions/2.7/bin/python2.7 
 
 ```
 
@@ -65,10 +65,18 @@ $ eval (paths -s python) -m http.server
 Serving HTTP on :: port 8000 (http://[::]:8000/) ...
 ```
 
-but remember, autoloaded fish scripts are generally not executable:
+More likely you would use this functionality to edit the containing file:
+
+```shell
+$ vi (paths -s myfunction)
+```
+
+Remember, autoloaded fish scripts are generally not executable in the the way you might think. This is because an autoloaded function is a file that defines the function. So running file alone just defines the function without running it:
 
 ```shell
 eval (paths -s ls)
 fish: Unknown command. '/usr/local/Cellar/fish/3.7.1/share/fish/functions/ls.fish' exists but is not an executable file.
 /usr/local/Cellar/fish/3.7.1/share/fish/functions/ls.fish
 ```
+
+

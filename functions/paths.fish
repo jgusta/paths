@@ -2,8 +2,7 @@
 # for fish shell
 # by jgusta (https://github.com/jgusta)
 
-# previously was polluting globals with "VERSION"
-set -gx ___paths_plugin_VERSION 1.2.3
+set -gx ___paths_plugin_VERSION 1.2.4
 
 function ___paths_plugin_wrap_bold
     set_color normal
@@ -71,9 +70,8 @@ function ___paths_plugin_help
         For declared functions such as those loaded by config.fish only the
         latest sourced function will be listed. i.e. if the function is overwritten,
         paths will not be able to tell what it was before it was overwritten. 
-        In the event of a function defined via stdin into the source command,
-        the output will path will be '-' unless the `--fail-if-not-path` option
-        is set."
+        Functions defined interactively, via stdin or via source have no file
+        path to list. The `--fail-if-not-path` option rejects these results."
     echo ""
     echo (___paths_plugin_wrap_bold "EXECUTABLE SCHEMES AND LOCATIONS")
     echo ""
@@ -81,19 +79,31 @@ function ___paths_plugin_help
         paths checks the following locations for executables in this order:
 
         1) functions defined interactively
-        2) functions defined via standard input into `source`
-        3) \$fish_function_path
-        4) \$fish_user_paths
-        5) \$PATH
-        6) builtins"
+        2) functions defined via stdin
+        3) functions defined via `source`
+        4) \$fish_function_path
+        5) \$fish_user_paths
+        6) \$PATH
+        7) embedded functions
+        8) builtins"
     echo ""
-    echo "Note that some builtins will appear twice because they are also in an executable path"
+    echo (___paths_plugin_wrap_bold "NOTES")
+    echo ""
+    echo "\
+        Some builtins will appear twice because they are also in an executable path.
+
+        \$fish_user_paths is automatically prepended to \$PATH so matches in the former will always also appear in the latter."
+
+    echo ""
+    echo "\
+        `paths` version $___paths_plugin_VERSION"
+    echo ""
 end
 
 function ___paths_plugin_short_help
     echo "executable matches in shell paths or fish autoload."
 
-    echo (___paths_plugin_wrap_bold "USAGE") "paths [-c|-s|-k|-f|-e|-d|-v] [NAME]"
+    echo (___paths_plugin_wrap_bold "USAGE") "paths [-c | -s | -k | -f | -e | -d | -v] [NAME]"
     echo ""
     echo (___paths_plugin_wrap_bold "ARGUMENTS")
     echo "       [NAME] - name of a fish autoload function, function, shell script, executable or builtin"
@@ -107,6 +117,8 @@ function ___paths_plugin_short_help
     echo "    -e, --fail-if-not-path       Return false if output not executable file. Implies -s (thus -k, -c)"
     echo "    -l, --list                   Show all places fish looks for executables"
     echo "    -v, --version.               Display version number"
+    echo ""
+    echo "`paths` version $___paths_plugin_VERSION"
     echo ""
 end
 
@@ -166,8 +178,9 @@ function ___paths_plugin_handle_found_item -a testName outFlags
     end
 
     set -f arrow "=>"
-    # Command matches must be files; --list displays search directories.
-    if test -f "$testName"; or begin; set -q _flag_l; and test -d "$testName"; end
+    if test -f "$testName"; or begin
+            set -q _flag_l; and test -d "$testName"
+        end
         set -f nameOut (string trim -- "$testName")
         if set -q _flag_d # directory flag
             set -f dir (dirname "$testName")
@@ -288,38 +301,36 @@ function paths --description "Reveal the executable matches in shell paths or fi
 
     set -f specialFlags (string split -n " " -- "$outFlags -z")
     set -l special
+    set -l embeddedDefinitions
     if not set -q _flag_l
-        set special (functions "$input" | string match -r -i "# Defined (?:via `(source)`|(interactively))" | awk NR==2)
+        set -l definition (functions -D "$input")
+        if functions "$input" | string match -rq '^# Defined interactively$'
+            set -a special interactively
+        else if contains -- stdin $definition
+            set -a special stdin
+        end
+        if contains -- - $definition
+            set -a special source
+        end
+        set embeddedDefinitions (string match 'embedded:*' -- $definition)
     end
 
-    if test "$special" = interactively
+    for origin in interactively stdin source
+        if not contains -- "$origin" $special
+            continue
+        end
         if set -q _flag_e
             echo "[paths plugin $___paths_plugin_VERSION] Function not a file" >&2
             return 1
         end
         if not set -q _flag_c
-            echo -e -n "Defined interactively\n"
+            if test "$origin" = interactively
+                echo "Defined interactively"
+            else
+                echo "Defined via $origin"
+            end
         end
         set foundStatus 0
-
-        set -f found (___paths_plugin_handle_found_item "$input" "$specialFlags")
-        echo "$found"
-        if set -q _flag_s
-            # stop after one
-            return $foundStatus
-        end
-    end
-
-    if test "$special" = source
-        if set -q _flag_e
-            echo "[paths plugin $___paths_plugin_VERSION] Function not a file" >&2
-            return 1
-        end
-        if not set -q _flag_c
-            echo -e -n "Defined via source\n"
-        end
-        set foundStatus 0
-        ___paths_plugin_handle_found_item
         if set -q _flag_s
             # stop after one
             return $foundStatus
@@ -395,6 +406,24 @@ function paths --description "Reveal the executable matches in shell paths or fi
         return $foundStatus
     end
 
+    if test (count $embeddedDefinitions) -gt 0
+        if set -q _flag_e
+            echo "[paths plugin $___paths_plugin_VERSION] Function not a file" >&2
+            return 1
+        end
+        if not set -q _flag_c
+            echo "Embedded function"
+        end
+        set foundStatus 0
+        for embeddedDefinition in $embeddedDefinitions
+            ___paths_plugin_handle_found_item "$embeddedDefinition" "$specialFlags"
+            echo
+            if set -q _flag_s
+                return $foundStatus
+            end
+        end
+    end
+
     set -l special (type -t $input)
     if test "$special" = builtin
         if set -q _flag_e
@@ -418,7 +447,10 @@ end
 # Changelog
 ########
 # 1.2.4 | 2026-11-24
-# - Change to test -f from test -f so that directories arent matches.
+# - Detect embedded functions
+# - Detect when function is defined by `source`
+# - Detect when function is defined by `stdin`. Unsure if this can happen, because defined interactively probably catches this.
+# - Change to test -f from test -e so that directories arent matches.
 # 1.2.3 | 2026-08-30
 # - Fix wrong version
 # - Fix -l/--list to work
@@ -434,5 +466,4 @@ end
 #   when updating via fisher
 # - Update help display
 # - Update README
-#
 ########
