@@ -2,7 +2,7 @@
 # for fish shell
 # by jgusta (https://github.com/jgusta)
 
-set -gx ___paths_plugin_VERSION 1.2.4
+set -gx ___paths_plugin_VERSION 1.2.5
 
 function ___paths_plugin_wrap_bold
     set_color normal
@@ -359,11 +359,18 @@ function paths --description "Reveal the executable matches in shell paths or fi
                 else if test "$pVar" = PATH; and contains -- "$t" $virtualEnvironmentBins
                     continue
                 end
-                set -f candidates "$searchPath/$input.fish" "$searchPath/$input"
+                set -f candidates "$searchPath/$input"
                 if set -q _flag_l
                     set candidates "$searchPath"
+                else if test "$pVar" = fish_function_path
+                    set candidates "$searchPath/$input.fish"
                 end
                 for snit in $candidates
+                    if not set -q _flag_l; and test "$pVar" != fish_function_path
+                        if not test -x "$snit"
+                            continue
+                        end
+                    end
                     set -f found (___paths_plugin_handle_found_item "$snit" "$outFlags")
                     set found (string trim -- "$found")
                     if test -n "$found"
@@ -446,6 +453,9 @@ end
 ########
 # Changelog
 ########
+# 1.2.5 | 2026-11-25
+# - Only match .fish autoload files in fish_function_path; require exact names
+#   and executable permission in fish_user_paths, PATH and virtual environments.
 # 1.2.4 | 2026-11-24
 # - Detect embedded functions
 # - Detect when function is defined by `source`
