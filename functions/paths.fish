@@ -2,7 +2,7 @@
 # for fish shell
 # by jgusta (https://github.com/jgusta)
 
-set -gx ___paths_plugin_VERSION 1.2.5
+set -gx ___paths_plugin_VERSION 1.2.6
 
 function ___paths_plugin_wrap_bold
     set_color normal
@@ -302,6 +302,7 @@ function paths --description "Reveal the executable matches in shell paths or fi
     set -f specialFlags (string split -n " " -- "$outFlags -z")
     set -l special
     set -l embeddedDefinitions
+    set -l definitionFiles
     if not set -q _flag_l
         set -l definition (functions -D "$input")
         if functions "$input" | string match -rq '^# Defined interactively$'
@@ -313,6 +314,11 @@ function paths --description "Reveal the executable matches in shell paths or fi
             set -a special source
         end
         set embeddedDefinitions (string match 'embedded:*' -- $definition)
+        for definitionPath in $definition
+            if test -f "$definitionPath"
+                set -a definitionFiles "$definitionPath"
+            end
+        end
     end
 
     for origin in interactively stdin source
@@ -333,6 +339,22 @@ function paths --description "Reveal the executable matches in shell paths or fi
         set foundStatus 0
         if set -q _flag_s
             # stop after one
+            return $foundStatus
+        end
+    end
+
+    for definitionFile in $definitionFiles
+        if set -q _flag_e
+            echo "[paths plugin $___paths_plugin_VERSION] Function not an executable command file" >&2
+            return 1
+        end
+        if not set -q _flag_c
+            echo "Defined in file"
+        end
+        ___paths_plugin_handle_found_item "$definitionFile" "$outFlags"
+        echo
+        set foundStatus 0
+        if set -q _flag_s
             return $foundStatus
         end
     end
@@ -366,6 +388,18 @@ function paths --description "Reveal the executable matches in shell paths or fi
                     set candidates "$searchPath/$input.fish"
                 end
                 for snit in $candidates
+                    if not set -q _flag_l; and test "$pVar" = fish_function_path
+                        set -l alreadyListed 0
+                        for definitionFile in $definitionFiles
+                            if test "$snit" -ef "$definitionFile"
+                                set alreadyListed 1
+                                break
+                            end
+                        end
+                        if test $alreadyListed -eq 1
+                            continue
+                        end
+                    end
                     if not set -q _flag_l; and test "$pVar" != fish_function_path
                         if not test -x "$snit"
                             continue
@@ -453,6 +487,9 @@ end
 ########
 # Changelog
 ########
+# 1.2.6 | 2026-11-26
+# - Show the current function's defining file before path searches, preserving
+#   separate autoload candidates and skipping duplicate autoload entries for that file.
 # 1.2.5 | 2026-11-25
 # - Only match .fish autoload files in fish_function_path; require exact names
 #   and executable permission in fish_user_paths, PATH and virtual environments.
